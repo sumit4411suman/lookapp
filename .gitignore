@@ -4,3 +4,4 @@ local.properties
 *.jks
 *.keystore
 .idea/
+firmware/relay/secrets.h

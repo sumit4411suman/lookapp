@@ -1,6 +1,6 @@
 # My Door Access — Phase 1 feasibility report
 
-Status: **Phase 1 only. No door has been unlocked. Nothing here has been built or run on a device.**
+Status: **No door has been unlocked by this project yet.** Findings below were updated after testing on the owner's phone.
 The build environment had no Android SDK and no access to zkteco.in, zkteco.com or GitHub reference repos, so
 the APK was not compiled and vendor docs were not read.
 
@@ -39,3 +39,10 @@ Release APK, HCE service, unlock integration, hardware tests (all 10 acceptance 
 ## Next steps
 Send: terminal model/firmware, the diagnostic output for the card, and the terminal's port list. Then Phase 2/3
 can be chosen on facts (vendor mobile credential, official API, or a minimal hardware add-on).
+
+## Findings from the owner's hardware (added)
+- Phone: SM-S931B (Galaxy S25), Android 17. NFC, NFC enabled, HCE and HCE-F all reported true by the diagnostic app.
+- Card: the Olympia card was not readable by the phone (all 13.56 MHz types polled). Conclusion: 125 kHz. A phone cannot read or
+  emulate 125 kHz, so **tap-to-unlock with the existing X6 is not possible.** Not independently confirmed beyond that scan.
+- Terminal (as reported by the owner): ZKTeco X6, standalone, BUT/GND exit input, NO/NC/COM relay, door-sensor input, no network.
+- Chosen path: Option 1, a Wi-Fi relay across BUT/GND. See `docs/DESIGN.md`.
