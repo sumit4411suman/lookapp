@@ -62,6 +62,7 @@ class HttpsRelayApi(
         c.useCaches = false
         c.instanceFollowRedirects = false
         c.requestMethod = method
+        if (method == "POST") { c.doOutput = true; c.setFixedLengthStreamingMode(0) } // must be set before connect()
         try {
             try {
                 c.connect()
@@ -71,11 +72,7 @@ class HttpsRelayApi(
                 throw RelayException(FailKind.OFFLINE, "Cannot reach $host:$port (${e.javaClass.simpleName})")
             }
             try {
-                if (method == "POST") {
-                    c.doOutput = true
-                    c.setFixedLengthStreamingMode(0)
-                    c.outputStream.close()
-                }
+                if (method == "POST") c.outputStream.close()
                 val code = c.responseCode
                 val body = (if (code in 200..299) c.inputStream else c.errorStream)?.use { it.readBytes().take(MAX_BODY).toByteArray().toString(Charsets.UTF_8) } ?: ""
                 return when (code) {
