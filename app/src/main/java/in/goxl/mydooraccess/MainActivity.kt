@@ -41,7 +41,15 @@ class MainActivity : Activity(), NfcAdapter.ReaderCallback {
         })
         report = TextView(this).apply { setTextIsSelectable(true); typeface = android.graphics.Typeface.MONOSPACE }
         root.addView(report)
-        setContentView(ScrollView(this).apply { addView(root, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) })
+        actionBar?.hide()
+        val scroll = ScrollView(this).apply { addView(root, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) }
+        // targetSdk 35 draws edge-to-edge; keep content clear of the status and navigation bars.
+        scroll.setOnApplyWindowInsetsListener { v, insets ->
+            @Suppress("DEPRECATION")
+            v.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+            insets
+        }
+        setContentView(scroll)
         refreshCapabilities()
     }
 
@@ -57,7 +65,8 @@ class MainActivity : Activity(), NfcAdapter.ReaderCallback {
         capabilities.appendLine("HCE-F (FeliCa): ${pm.hasSystemFeature(PackageManager.FEATURE_NFC_HOST_CARD_EMULATION_NFCF)}")
         capabilities.appendLine("Note: HCE cannot emulate MIFARE Classic or 125 kHz cards.")
         capabilities.appendLine()
-        capabilities.appendLine("Hold the physical Olympia card against the back of the phone.")
+        capabilities.appendLine("Scanning for a card... hold the physical Olympia card against the back of the phone,")
+        capabilities.appendLine("near the top centre, and keep it still.")
         capabilities.appendLine("If nothing appears after ~10 s, the card is probably 125 kHz (the phone cannot read it).")
         report.text = capabilities
     }
