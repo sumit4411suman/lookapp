@@ -1,22 +1,20 @@
 package `in`.goxl.mydooraccess
 
-import com.sun.net.httpserver.HttpsConfigurator
-import com.sun.net.httpserver.HttpsServer
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import java.io.File
-import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.security.KeyStore
 import java.security.MessageDigest
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLServerSocket
 
 /** Runs the real client against a local TLS server with a throw-away self-signed certificate. */
 class HttpsRelayApiTest {
-    private lateinit var server: HttpsServer
+    private lateinit var server: SSLServerSocket
     private lateinit var pin: String
     private var port = 0
 
@@ -32,20 +30,32 @@ class HttpsRelayApiTest {
         pin = MessageDigest.getInstance("SHA-256").digest(ks.getCertificate("t").encoded).toHex()
         val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply { init(ks, "changeit".toCharArray()) }
         val ctx = SSLContext.getInstance("TLS").apply { init(kmf.keyManagers, null, null) }
-        server = HttpsServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.httpsConfigurator = HttpsConfigurator(ctx)
-        server.createContext("/challenge") { ex ->
-            val b = "{\"nonce\":\"00112233445566778899aabbccddeeff\"}".toByteArray()
-            ex.sendResponseHeaders(200, b.size.toLong()); ex.responseBody.use { it.write(b) }
-        }
-        server.createContext("/unlock") { ex ->
-            ex.sendResponseHeaders(401, -1); ex.close()
-        }
-        server.start()
-        port = server.address.port
+        server = ctx.serverSocketFactory.createServerSocket(0, 5, java.net.InetAddress.getByName("127.0.0.1")) as SSLServerSocket
+        port = server.localPort
+        Thread {
+            while (!server.isClosed) {
+                try {
+                    server.accept().use { sock ->
+                        val head = sock.getInputStream().bufferedReader().let { r ->
+                            val first = r.readLine() ?: ""
+                            while (true) { val l = r.readLine(); if (l == null || l.isEmpty()) break }
+                            first
+                        }
+                        val (status, body) = when {
+                            head.startsWith("GET /challenge") -> "200 OK" to "{\"nonce\":\"00112233445566778899aabbccddeeff\"}"
+                            head.startsWith("POST /unlock") -> "401 Unauthorized" to ""
+                            else -> "404 Not Found" to ""
+                        }
+                        sock.getOutputStream().write(("HTTP/1.1 $status\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n$body").toByteArray())
+                    }
+                } catch (e: Exception) {
+                    // handshake aborted by a client that refused our certificate, or socket closed
+                }
+            }
+        }.apply { isDaemon = true }.start()
     }
 
-    @After fun stop() { server.stop(0) }
+    @After fun stop() { server.close() }
 
     @Test fun correctPinConnects() {
         assertEquals("00112233445566778899aabbccddeeff", HttpsRelayApi("127.0.0.1", port, pin).challenge())
